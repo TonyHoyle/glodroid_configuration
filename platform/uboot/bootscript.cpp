@@ -152,13 +152,7 @@ FUNC_BEGIN(bootcmd_block)
  DEVICE_HANDLE_BUTTONS()
 #endif
  run bootcmd_bcb
- if test STRESC(\$androidrecovery) = STRESC("true");
- then
-  /* Always unlock device for fastbootd and recovery modes, otherwise fastbootd flashing won't work. TODO: Support conditional lock/unlock */
-  EXTENV(bootargs, " androidboot.verifiedbootstate=orange ");
- else
-  run bootcmd_avb;
- fi;
+ EXTENV(bootargs, " androidboot.verifiedbootstate=orange ");
 
  part start mmc \$mmc_bootdev boot_\$slot_name boot_start &&
  part size  mmc \$mmc_bootdev boot_\$slot_name boot_size

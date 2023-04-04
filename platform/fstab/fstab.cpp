@@ -11,11 +11,11 @@
 #define __FILE_ENCRYPT__ fileencryption=aes-256-xts:aes-256-cts
 #endif
 
-system                              /system         ext4    ro,barrier=1                          wait,first_stage_mount,logical,slotselect,avb=vbmeta_system,avb_keys=/avb
-system_ext                          /system_ext     ext4    ro,barrier=1                          wait,first_stage_mount,logical,slotselect,avb=vbmeta_system
-product                             /product        ext4    ro,barrier=1                          wait,first_stage_mount,logical,slotselect,avb=vbmeta_system
-vendor                              /vendor         ext4    ro,barrier=1                          wait,first_stage_mount,logical,slotselect,avb=vbmeta
-vendor_dlkm                         /vendor_dlkm    ext4    ro,noatime,errors=panic               wait,first_stage_mount,logical,slotselect,avb=vbmeta
+system                              /system         ext4    ro,barrier=1                          wait,first_stage_mount,logical,slotselect
+system_ext                          /system_ext     ext4    ro,barrier=1                          wait,first_stage_mount,logical,slotselect
+product                             /product        ext4    ro,barrier=1                          wait,first_stage_mount,logical,slotselect
+vendor                              /vendor         ext4    ro,barrier=1                          wait,first_stage_mount,logical,slotselect
+vendor_dlkm                         /vendor_dlkm    ext4    ro,noatime,errors=panic               wait,first_stage_mount,logical,slotselect
 
 /dev/block/by-name/misc             /misc           emmc    defaults                              defaults
 
