@@ -46,7 +46,7 @@ EXTENV(partitions, ";name=userdata,size=-,uuid=\${uuid_gpt_userdata}")
 setenv bootargs " init=/init rootwait ro androidboot.boottime=223.708 androidboot.selinux=permissive"
 EXTENV(bootargs, " androidboot.revision=1.0 androidboot.board_id=0x1234567 androidboot.serialno=${serial#}")
 EXTENV(bootargs, " firmware_class.path=/vendor/etc/firmware")
-EXTENV(bootargs, " ${debug_bootargs} printk.devkmsg=on")
+EXTENV(bootargs, " ${debug_bootargs} printk.devkmsg=on quiet")
 
 FUNC_BEGIN(enter_fastboot)
 #ifdef PRE_ENTER_FASTBOOT
