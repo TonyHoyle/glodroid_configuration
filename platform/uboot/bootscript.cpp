@@ -10,6 +10,8 @@
 #include "platform.h"
 #include "device.h"
 
+echo "Android Booting from $devtype:$devnum"
+
 #ifdef PLATFORM_SETUP_ENV
 PLATFORM_SETUP_ENV()
 #else
@@ -62,16 +64,16 @@ FUNC_BEGIN(enter_fastboot)
  if test STRESC(${fastboot_fail}) = STRESC(1);
  then
   /* If the sdcard image is deploy image - reformat the GPT to allow fastbootd to flash Android partitions */
-  part start mmc \$mmc_bootdev misc misc_start || gpt write $partitions
+  part start \$devtype \$devnum misc misc_start || gpt write $partitions
   /* Boot into the fastbootd mode */
-  bcb load $mmc_bootdev misc && bcb set command boot-fastboot && bcb store
+  bcb load \$devtype \$devnum misc && bcb set command boot-fastboot && bcb store
  fi;
 FUNC_END()
 
 FUNC_BEGIN(bootcmd_bcb)
- ab_test slot_name mmc \${mmc_bootdev}#misc || run enter_fastboot ;
+ ab_select slot_name \$devtype \${devnum}#misc --no-dec || run enter_fastboot ;
 
- bcb load $mmc_bootdev misc ;
+ bcb load \$devtype \$devnum misc ;
  /* Handle $ adb reboot bootloader */
  bcb test command = bootonce-bootloader && bcb clear command && bcb store && run enter_fastboot ;
  /* Handle $ adb reboot fastboot */
@@ -82,14 +84,14 @@ FUNC_BEGIN(bootcmd_bcb)
  if test STRESC(\${androidrecovery}) != STRESC(true);
  then
   /* ab_select is used as counter of failed boot attempts. After 14 failed boot attempt fallback to fastboot. */
-  ab_select slot_name mmc \${mmc_bootdev}#misc || run enter_fastboot ;
+  ab_select slot_name \$devtype \${devnum}#misc || run enter_fastboot ;
  fi;
 
  FEXTENV(bootargs, " androidboot.slot_suffix=_\$slot_name") ;
 FUNC_END()
 
 FUNC_BEGIN(avb_verify)
- avb init \$mmc_bootdev; avb verify _\$slot_name;
+ avb init \$devnum; avb verify _\$slot_name;
 FUNC_END()
 
 FUNC_BEGIN(bootcmd_avb)
@@ -107,12 +109,19 @@ FUNC_BEGIN(bootcmd_avb)
 FUNC_END()
 
 FUNC_BEGIN(bootcmd_prepare_env)
- setenv bootdevice_path STRESC(__SYSFS_MMC0_PATH__);
- if test STRESC(${mmc_bootdev}) = STRESC(1);
+ if test \"\${devtype}\" = \"mmc";
  then
-  setenv bootdevice_path STRESC(__SYSFS_MMC1_PATH__);
+ setenv device_path \"emmc2bus/fe340000.mmc\";
  fi;
- FEXTENV(bootargs, " androidboot.boot_devices=\${bootdevice_path}") ;
+ if test \"\${devtype}\" = \"nvme\";
+ then
+ setenv device_path \"scb/fd500000.pcie\";
+ fi;
+ if test \"\${devtype}\" = \"usb\";
+ then
+ setenv device_path \"soc/fe980000.usb\";
+ fi;
+ FEXTENV(bootargs, " androidboot.boot_devices=\${device_path}") ;
 FUNC_END()
 
 FUNC_BEGIN(bootcmd_start)
@@ -154,35 +163,33 @@ FUNC_BEGIN(bootcmd_block)
  run bootcmd_bcb
  EXTENV(bootargs, " androidboot.verifiedbootstate=orange ");
 
- part start mmc \$mmc_bootdev boot_\$slot_name boot_start &&
- part size  mmc \$mmc_bootdev boot_\$slot_name boot_size
+ part start \$devtype \$devnum boot_\$slot_name boot_start &&
+ part size \$devtype \$devnum boot_\$slot_name boot_size
 
- part start mmc \$mmc_bootdev vendor_boot_\$slot_name vendor_boot_start &&
- part size  mmc \$mmc_bootdev vendor_boot_\$slot_name vendor_boot_size
+ part start \$devtype \$devnum vendor_boot_\$slot_name vendor_boot_start &&
+ part size \$devtype \$devnum vendor_boot_\$slot_name vendor_boot_size
 
- part start mmc \$mmc_bootdev dtbo_\$slot_name dtbo_start &&
- part size  mmc \$mmc_bootdev dtbo_\$slot_name dtbo_size
-
- mmc dev \$mmc_bootdev &&
- mmc read \$loadaddr \$boot_start \$boot_size
- mmc read \$vloadaddr \$vendor_boot_start \$vendor_boot_size
- mmc read \$dtboaddr \$dtbo_start \$dtbo_size
+ part start \$devtype \$devnum dtbo_\$slot_name dtbo_start &&
+ part size \$devtype \$devnum dtbo_\$slot_name dtbo_size
+ \$devtype dev \$devnum &&
+ \$devtype read \$loadaddr \$boot_start \$boot_size
+ \$devtype read \$vloadaddr \$vendor_boot_start \$vendor_boot_size
+ \$devtype read \$dtboaddr \$dtbo_start \$dtbo_size
 FUNC_END()
 
 FUNC_BEGIN(rename_and_expand_userdata_placeholder)
-  part number mmc ${mmc_bootdev} userdata_placeholder partition_number
+  part number $devtype ${devnum} userdata_placeholder partition_number
   if test -n "${partition_number}";
   then
     echo "Renaming userdata_placeholder partition to userdata...";
-    gpt read mmc ${mmc_bootdev} current_layout
+    gpt read $devtype ${devnum} current_layout
     setexpr new_layout gsub "name=userdata_placeholder" "name=userdata" ${current_layout}
-    gpt write mmc ${mmc_bootdev} ${new_layout}
+    gpt write $devtype ${devnum} ${new_layout}
     echo "The userdata_placeholder partition has been renamed to userdata.";
-
     echo "Expanding userdata partition to fill the entire drive...";
-    gpt read mmc ${mmc_bootdev} expanded_layout
+    gpt read $devtype ${devnum} expanded_layout
     setexpr final_layout gsub "name=userdata,start=[^,]*,size=[^,]*,uuid" "name=userdata,start=[^,]*,size=-,uuid" ${expanded_layout}
-    gpt write mmc ${mmc_bootdev} ${final_layout}
+    gpt write $devtype ${devnum} ${final_layout}
     echo "The userdata partition has been expanded.";
   fi;
 FUNC_END()
