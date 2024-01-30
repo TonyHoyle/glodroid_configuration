@@ -136,10 +136,9 @@ $(BOOTSCRIPT_GEN): $(GD_BOOTSCRIPT) $(BSP_UBOOT_PATH)/bootscript.h $(GD_BOOTSCRI
 	cp $(BSP_UBOOT_PATH)/bootscript.h $(dir $(BOOTSCRIPT_GEN))/
 	cp $(GD_BOOTSCRIPT_OVERLAY_PLATFORM) $(dir $(BOOTSCRIPT_GEN))/platform.h
 	cp $(GD_BOOTSCRIPT_OVERLAY_DEVICE) $(dir $(BOOTSCRIPT_GEN))/device.h
-	$(CLANG) -E -P -Wno-invalid-pp-token -Wno-reserved-user-defined-literal $(dir $(BOOTSCRIPT_GEN))/$(notdir $<) -o $@ \
+	$(CLANG) -E -P -Wno-invalid-pp-token $(dir $(BOOTSCRIPT_GEN))/$(notdir $<) -o $@ \
 	    -D__SYSFS_MMC0_PATH__=$(SYSFS_MMC0_PATH) \
 	    -D__SYSFS_MMC1_PATH__=$(SYSFS_MMC1_PATH) \
-	    -D__GD_SUPER_PARTITION_SIZE_MB__=$(GD_SUPER_PARTITION_SIZE_MB) \
 
 $(UBOOT_OUT)/boot.scr: $(BOOTSCRIPT_GEN) $(UBOOT_BINARY)
 	$(UBOOT_OUT)/tools/mkimage -A arm -O linux -T script -C none -a 0 -e 0 -d $< $@
@@ -191,9 +190,7 @@ $(PRODUCT_OUT)/bootloader-deploy-emmc.img $(PRODUCT_OUT)/bootloader-sd.img $(PRO
 endif
 
 ifeq ($(PRODUCT_BOARD_PLATFORM),broadcom)
-KERNEL_OUT    := $(PRODUCT_OUT)/obj/GLODROID/KERNEL
-KERNEL_TARGET := $(KERNEL_OUT)/install/kernel
-DTBS_DIR      := $(KERNEL_OUT)/install/dtbs
+DTBS_DIR := $(PRODUCT_OUT)/obj/GLODROID/KERNEL/install/dtbs
 BOOT_FILES := \
     $(RPI_FIRMWARE_DIR)/boot/bootcode.bin \
     $(RPI_FIRMWARE_DIR)/boot/start_x.elf \
@@ -206,7 +203,7 @@ BOOT_FILES := \
 
 OVERLAY_FILES := $(sort $(shell find -L $(RPI_FIRMWARE_DIR)/boot/overlays))
 
-$(PRODUCT_OUT)/bootloader-sd.img: $(UBOOT_BINARY) $(OVERLAY_FILES) $(ATF_BINARY) $(RPI_CONFIG) $(KERNEL_TARGET)
+$(PRODUCT_OUT)/bootloader-sd.img: $(UBOOT_BINARY) $(OVERLAY_FILES) $(ATF_BINARY) $(RPI_CONFIG) $(KERNEL_BINARY)
 	dd if=/dev/null of=$@ bs=1 count=1 seek=$$(( 128 * 1024 * 1024 - 256 * 512 ))
 	/sbin/mkfs.vfat -F 32 -n boot $@
 	/usr/bin/mcopy -i $@ $(UBOOT_BINARY) ::$(notdir $(UBOOT_BINARY))

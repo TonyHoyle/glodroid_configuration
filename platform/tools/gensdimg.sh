@@ -42,27 +42,18 @@ gen_image() {
         BL_SIZE=$(( 1024 * 1024 * 2 - 128 * 1024 ))
     fi
 
-    if [ "$PLATFORM" = "broadcom" ]; then
-        BL_START=128K
-        BL_SIZE=$(( 1024 * 1024 * 128 - 128 * 1024 ))
-    fi
-
     if [ "$TYPE" != "SD" ]; then
         ${PARTED_TOOL} create_empty  ${BASE_ARGS} --size=256M
     else
-        # Adjust SD card size to fit super.img and other partitions
-        SUPER_IMG_SIZE_MB=$(( $(stat -c%s super.img) / (1024 * 1024) ))
-        # Add 512M for remaining partitions. Align to 1G.
-        SD_SIZE_GB=$(( (SUPER_IMG_SIZE_MB + 512 + 1024 - 1) / 1024 ))
-        ${PARTED_TOOL} create_empty  ${BASE_ARGS} --size=${SD_SIZE_GB}G
+        ${PARTED_TOOL} create_empty  ${BASE_ARGS} --size=4G
     fi
 
     ${PARTED_TOOL} add_image     ${BASE_ARGS} --partition-name=bootloader --start=${BL_START} --size=${BL_SIZE} --img-file=bootloader-$SUFFIX.img
-    ${PARTED_TOOL} add_image     ${BASE_ARGS} --partition-name=uboot-env                      --size=512K       --img-file=env.img
+    ${PARTED_TOOL} add_image     ${BASE_ARGS} --partition-name=uboot-env  --start=3M          --size=512K       --img-file=env.img
 
     if [ "$PLATFORM" = "broadcom" ]; then
         # Broadcom ROM code will look for a FAT16 partition on MBR (It doesn't support GPT). Therefore, create a hybrid MBR.
-        ${PARTED_TOOL} set_as_mbr_partition ${BASE_ARGS} --partition-name=bootloader --part-type=0x4
+        ${PARTED_TOOL} set_as_mbr_partition ${BASE_ARGS} --partition-name=bootloader
     fi
 
     # Skip remaining for deploy images
@@ -71,13 +62,12 @@ gen_image() {
     fi
 
     ${PARTED_TOOL} add_partition ${BASE_ARGS} --partition-name=misc                  --size=512K
-    ${PARTED_TOOL} add_partition ${BASE_ARGS} --partition-name=frp                   --size=512K
     ${PARTED_TOOL} add_image     ${BASE_ARGS} --partition-name=boot_a                --size=64M  --img-file=boot.img
     ${PARTED_TOOL} add_partition ${BASE_ARGS} --partition-name=boot_b                --size=64M
-    ${PARTED_TOOL} add_image     ${BASE_ARGS} --partition-name=init_boot_a           --size=8M   --img-file=init_boot.img
-    ${PARTED_TOOL} add_partition ${BASE_ARGS} --partition-name=init_boot_b           --size=8M
     ${PARTED_TOOL} add_image     ${BASE_ARGS} --partition-name=vendor_boot_a         --size=32M  --img-file=vendor_boot.img
     ${PARTED_TOOL} add_partition ${BASE_ARGS} --partition-name=vendor_boot_b         --size=32M
+    ${PARTED_TOOL} add_image     ${BASE_ARGS} --partition-name=dtbo_a                --size=8M   --img-file=boot_dtbo.img
+    ${PARTED_TOOL} add_partition ${BASE_ARGS} --partition-name=dtbo_b                --size=8M
     ${PARTED_TOOL} add_image     ${BASE_ARGS} --partition-name=vbmeta_a              --size=512K --img-file=vbmeta.img
     ${PARTED_TOOL} add_partition ${BASE_ARGS} --partition-name=vbmeta_b              --size=512K
     ${PARTED_TOOL} add_image     ${BASE_ARGS} --partition-name=vbmeta_system_a       --size=512K --img-file=vbmeta_system.img

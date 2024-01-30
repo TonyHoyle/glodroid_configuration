@@ -16,7 +16,8 @@ PLATFORM_SETUP_ENV()
 #error PLATFORM_SETUP_ENV is not defined
 #endif
 
-setenv dtb_index 0x0
+setenv    main_fdt_id 0x100
+setenv overlay_fdt_id 0xFFF
 
 /* EMMC cards have 512k erase block size. Align partitions accordingly to avoid issues with erasing. */
 
@@ -28,18 +29,17 @@ EXTENV(partitions, ";name=bootloader,start=128K,size=130944K,uuid=\${uuid_gpt_bo
 #endif
 EXTENV(partitions, ";name=uboot-env,size=512K,uuid=\${uuid_gpt_reserved}")
 EXTENV(partitions, ";name=misc,size=512K,uuid=\${uuid_gpt_misc}")
-EXTENV(partitions, ";name=frp,size=512K,uuid=\${uuid_gpt_frp}")
 EXTENV(partitions, ";name=boot_a,size=64M,uuid=\${uuid_gpt_boot_a}")
 EXTENV(partitions, ";name=boot_b,size=64M,uuid=\${uuid_gpt_boot_b}")
-EXTENV(partitions, ";name=init_boot_a,size=8M,uuid=\${uuid_gpt_init_boot_a}")
-EXTENV(partitions, ";name=init_boot_b,size=8M,uuid=\${uuid_gpt_init_boot_b}")
 EXTENV(partitions, ";name=vendor_boot_a,size=32M,uuid=\${uuid_gpt_vendor_boot_a}")
 EXTENV(partitions, ";name=vendor_boot_b,size=32M,uuid=\${uuid_gpt_vendor_boot_b}")
+EXTENV(partitions, ";name=dtbo_a,size=8M,uuid=\${uuid_gpt_dtbo_a}")
+EXTENV(partitions, ";name=dtbo_b,size=8M,uuid=\${uuid_gpt_dtbo_b}")
 EXTENV(partitions, ";name=vbmeta_a,size=512K,uuid=\${uuid_gpt_vbmeta_a}")
 EXTENV(partitions, ";name=vbmeta_b,size=512K,uuid=\${uuid_gpt_vbmeta_b}")
 EXTENV(partitions, ";name=vbmeta_system_a,size=512K,uuid=\${uuid_gpt_vbmeta_system_a}")
 EXTENV(partitions, ";name=vbmeta_system_b,size=512K,uuid=\${uuid_gpt_vbmeta_system_b}")
-EXTENV(partitions, ";name=super,size="STR(__GD_SUPER_PARTITION_SIZE_MB__)"M,uuid=\${uuid_gpt_super}")
+EXTENV(partitions, ";name=super,size=2000M,uuid=\${uuid_gpt_super}")
 EXTENV(partitions, ";name=metadata,size=16M,uuid=\${uuid_gpt_metadata}")
 EXTENV(partitions, ";name=userdata,size=-,uuid=\${uuid_gpt_userdata}")
 
@@ -69,7 +69,7 @@ FUNC_BEGIN(enter_fastboot)
 FUNC_END()
 
 FUNC_BEGIN(bootcmd_bcb)
- ab_select slot_name mmc \${mmc_bootdev}#misc --no-dec || run enter_fastboot ;
+ ab_test slot_name mmc \${mmc_bootdev}#misc || run enter_fastboot ;
 
  bcb load $mmc_bootdev misc ;
  /* Handle $ adb reboot bootloader */
@@ -120,8 +120,9 @@ FUNC_BEGIN(bootcmd_start)
  then
   FEXTENV(bootargs, " androidboot.force_normal_boot=1") ;
  fi;
- abootimg addr \$abootimg_boot_ptr \$abootimg_vendor_boot_ptr \$abootimg_init_boot_ptr
+ abootimg addr \$loadaddr \$vloadaddr
 
+ adtimg addr \${dtboaddr}
 #ifdef DEVICE_HANDLE_FDT
  DEVICE_HANDLE_FDT()
 #endif
@@ -130,11 +131,19 @@ FUNC_BEGIN(bootcmd_start)
 #else
 #error PLATFORM_HANDLE_FDT is not defined
 #endif
+
+#ifdef platform_broadcom
+#endif
+ adtimg get dt --id=\$overlay_fdt_id dtb_start dtb_size overlay_fdt_index &&
+ cp.b \$dtb_start \$dtboaddr \$dtb_size &&
+ fdt resize 8192 &&
 #ifdef POSTPROCESS_FDT
  POSTPROCESS_FDT()
 #endif
+ fdt apply \$dtboaddr &&
+ FEXTENV(bootargs, " androidboot.dtbo_idx=\${main_fdt_index},\${overlay_fdt_index}") ;
  /* START KERNEL */
- bootm \$abootimg_boot_ptr
+ bootm \$loadaddr
  /* Should never get here */
 FUNC_END()
 
@@ -143,11 +152,6 @@ FUNC_BEGIN(bootcmd_block)
  DEVICE_HANDLE_BUTTONS()
 #endif
  run bootcmd_bcb
-
- abootimg load mmc \$mmc_bootdev boot        \${slot_name}
- abootimg load mmc \$mmc_bootdev init_boot   \${slot_name}
- abootimg load mmc \$mmc_bootdev vendor_boot \${slot_name}
-
  if test STRESC(\$androidrecovery) = STRESC("true");
  then
   /* Always unlock device for fastbootd and recovery modes, otherwise fastbootd flashing won't work. TODO: Support conditional lock/unlock */
@@ -155,6 +159,20 @@ FUNC_BEGIN(bootcmd_block)
  else
   run bootcmd_avb;
  fi;
+
+ part start mmc \$mmc_bootdev boot_\$slot_name boot_start &&
+ part size  mmc \$mmc_bootdev boot_\$slot_name boot_size
+
+ part start mmc \$mmc_bootdev vendor_boot_\$slot_name vendor_boot_start &&
+ part size  mmc \$mmc_bootdev vendor_boot_\$slot_name vendor_boot_size
+
+ part start mmc \$mmc_bootdev dtbo_\$slot_name dtbo_start &&
+ part size  mmc \$mmc_bootdev dtbo_\$slot_name dtbo_size
+
+ mmc dev \$mmc_bootdev &&
+ mmc read \$loadaddr \$boot_start \$boot_size
+ mmc read \$vloadaddr \$vendor_boot_start \$vendor_boot_size
+ mmc read \$dtboaddr \$dtbo_start \$dtbo_size
 FUNC_END()
 
 FUNC_BEGIN(rename_and_expand_userdata_placeholder)
