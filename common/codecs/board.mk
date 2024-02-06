@@ -19,4 +19,3 @@ BOARD_VENDOR_SEPOLICY_DIRS += $(BCDC_PATH)/sepolicy/vendor
 
 DEVICE_FRAMEWORK_COMPATIBILITY_MATRIX_FILE += \
     $(BCDC_PATH)/device_framework_compatibility_matrix_ffmpegcodec2.xml \
-    $(BCDC_PATH)/device_framework_compatibility_matrix_v4l2codec2.xml \
